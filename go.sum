@@ -8,6 +8,8 @@ github.com/go-viper/mapstructure/v2 v2.4.0 h1:EBsztssimR/CONLSZZ04E8qAkxNYq4Qp9L
 github.com/go-viper/mapstructure/v2 v2.4.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
 github.com/golang-jwt/jwt/v5 v5.2.2 h1:Rl4B7itRWVtYIHFrSNd7vhTiz9UpLdi6gZhZ3wEeDy8=
 github.com/golang-jwt/jwt/v5 v5.2.2/go.mod h1:pqrtFR0X4osieyHYxtmOUWsAWrfe1Q5UVIyoH402zdk=
+github.com/golang/snappy v1.0.0 h1:Oy607GVXHs7RtbggtPBnr2RmDArIsAefDwvrdWvRhGs=
+github.com/golang/snappy v1.0.0/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/google/jsonschema-go v0.4.2 h1:tmrUohrwoLZZS/P3x7ex0WAVknEkBZM46iALbcqoRA8=
@@ -44,8 +46,10 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zIM+UJPGz4=
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
-go.dw1.io/x/exp/sandboxec v0.0.0-20260214195720-d68f1ab98dfb h1:bHdok6dGwi47d/k7xZyn2VtBVCQ3Tuvnds0Pju7CfEk=
-go.dw1.io/x/exp/sandboxec v0.0.0-20260214195720-d68f1ab98dfb/go.mod h1:CQRRKXvVM86QVqD0IDHzH3bi4dFpOumx56Et3Gcgoh0=
+go.dw1.io/fastcache v0.2.0 h1:IMR01rKe2DMkY2lIC8QwMDRhelX7VwABKlmSi45tzWM=
+go.dw1.io/fastcache v0.2.0/go.mod h1:VBo/z/zNpd9ox3ag0t6JRmKTc3+kzyhZ9YibAEoMD1s=
+go.dw1.io/x/exp/sandboxec v0.0.0-20260216060534-d18485fc1746 h1:cbQqPnWeoi+Syh/M11d/EkBtMqC1iurfCzXegq3AcV8=
+go.dw1.io/x/exp/sandboxec v0.0.0-20260216060534-d18485fc1746/go.mod h1:YoIsiJkgCqO4VwtbbOluNCi34jybTshBgcrOkCQZFOA=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
 golang.org/x/oauth2 v0.30.0 h1:dnDm7JmhM45NNpd8FDDeLhK6FwqbOf4MLCM9zb1BOHI=

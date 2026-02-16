@@ -1,7 +1,8 @@
 abi: 6
 ignore-if-missing: true
+unsafe-host-runtime: true
 fs:
-  - rx:/
+  - rx:$HOME/.local/share/claude
   - rw:$HOME/.claude/
   - rw:$HOME/.claude.json
   - rw:$PWD

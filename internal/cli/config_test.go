@@ -21,7 +21,7 @@ func TestLoadConfig_DefaultsWhenMissing(t *testing.T) {
 	if cfg.Mode != "run" {
 		t.Fatalf("unexpected default mode: %q", cfg.Mode)
 	}
-	if cfg.ABI != 0 || cfg.BestEffort || cfg.IgnoreIfMissing || cfg.RestrictScoped {
+	if cfg.ABI != 0 || cfg.BestEffort || cfg.IgnoreIfMissing || cfg.RestrictScoped || cfg.UnsafeHostRuntime {
 		t.Fatalf("unexpected default scalar config: %+v", cfg)
 	}
 	if len(cfg.FSRules) != 0 || len(cfg.NetworkRules) != 0 {
@@ -38,6 +38,7 @@ func TestLoadConfig_ExplicitYAML(t *testing.T) {
 		"best-effort: true",
 		"ignore-if-missing: true",
 		"restrict-scoped: true",
+		"unsafe-host-runtime: true",
 		"fs:",
 		"  - rx:/bin",
 		"  - rw:/tmp",
@@ -56,7 +57,7 @@ func TestLoadConfig_ExplicitYAML(t *testing.T) {
 	if cfg.Mode != "mcp" {
 		t.Fatalf("unexpected mode: %q", cfg.Mode)
 	}
-	if cfg.ABI != 6 || !cfg.BestEffort || !cfg.IgnoreIfMissing || !cfg.RestrictScoped {
+	if cfg.ABI != 6 || !cfg.BestEffort || !cfg.IgnoreIfMissing || !cfg.RestrictScoped || !cfg.UnsafeHostRuntime {
 		t.Fatalf("unexpected scalar config: %+v", cfg)
 	}
 	if !reflect.DeepEqual(cfg.FSRules, []string{"rx:/bin", "rw:/tmp"}) {
