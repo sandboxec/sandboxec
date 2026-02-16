@@ -102,18 +102,13 @@ Restrictions are applied immediately before launching the target command. Once s
 sandboxec [OPTIONS] [COMMAND [ARG...]]
 ```
 
-Or run as an MCP server over stdio transport:
-
-```bash
-sandboxec -m mcp [OPTIONS]
-```
-
 Examples:
 
 ```bash
 sandboxec --fs rx:/usr /usr/bin/echo hello
 sandboxec --fs rx:/usr -- /usr/bin/ls /usr
 sandboxec --fs rx:/usr --net c:<PORT> -- /usr/bin/curl http://127.0.0.1:<PORT>
+sandboxec --mode mcp --fs rx:/usr --fs rw:$PWD --net c:443
 ```
 
 ## Options
@@ -127,6 +122,7 @@ sandboxec --fs rx:/usr --net c:<PORT> -- /usr/bin/curl http://127.0.0.1:<PORT>
 | `--best-effort` | Continue even if the kernel lacks support for some features. |
 | `--ignore-if-missing` | Do not fail if a rule path does not exist. |
 | `--restrict-scoped` | Enable scoped IPC restrictions (requires ABI v6+). |
+| `--unsafe-host-runtime` | Allow read_exec rights for host runtime paths. |
 | `-m, --mode string` | Execution mode (`run` or `mcp`). Default: `run`. |
 | `-V, --version` | Show app version. |
 | `-h, --help` | Show help. |
@@ -139,6 +135,7 @@ Available MCP tools:
 
 > [!NOTE]
 > * `--restrict-scoped` requires Landlock ABI v6+.
+> * `--unsafe-host-runtime` broadens allowed runtime & library access and weakens least-privilege guarantees.
 > * In `--mode mcp`, no wrapped command arguments are accepted.
 
 ## Rule format
@@ -191,6 +188,7 @@ abi: 6
 best-effort: false
 ignore-if-missing: false
 restrict-scoped: false
+unsafe-host-runtime: false
 fs:
   - rx:/bin
 net:
@@ -210,7 +208,7 @@ If no config file is found, defaults are used.
 
 ### Precedence rules
 
-- CLI flags override config values for scalar options (`mode`, `abi`, `best-effort`, `ignore-if-missing`, `restrict-scoped`).
+- CLI flags override config values for scalar options.
 - `--fs` and `--net` replace config lists when those flags are set.
 - If those flags are not set, rules come from config.
 
@@ -221,6 +219,7 @@ abi: 6
 best-effort: true
 ignore-if-missing: true
 restrict-scoped: false
+unsafe-host-runtime: false
 fs:
   - rx:/bin
   - rx:/usr
@@ -241,6 +240,7 @@ net:
 
 - **Allow-list only**: If a path isn't listed, it is invisible or inaccessible.
 - **Dependencies**: Binaries often need to read `/lib`, `/usr/lib`, or shared object dependencies (`.so` files).
+- **Unsafe runtime behavior**: `--unsafe-host-runtime` adds `read_exec` rights for PATH-derived runtime targets and its resolved shared-library dependency files discovered from executable entries, hence it can significantly increase startup latency, especially for short-lived commands.
 - **Network**: Rules control TCP bind/connect. They do not replace firewalls.
 - **Scope**: This is not a full container or VM replacement. It is a fast, command-level control layer for risky workloads.
 
@@ -275,6 +275,17 @@ sandboxec \
 
 ```bash
 sandboxec --fs rx:/usr --net c:443 -- /usr/bin/curl https://example.com
+```
+
+### Use unsafe host runtime for host-linked tooling
+
+```bash
+sandboxec \
+  --unsafe-host-runtime \
+  --fs rw:$PWD \
+  --fs rw:/tmp \
+  --net c:443 \
+  -- your-build-command
 ```
 
 ### Run with explicit config file

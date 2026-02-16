@@ -45,6 +45,7 @@ func Run(argv []string) (int, error) {
 	flagSet.Bool("best-effort", false, "Ignore unsupported ABI/Landlock availability")
 	flagSet.Bool("ignore-if-missing", false, "Ignore missing fs rule paths")
 	flagSet.Bool("restrict-scoped", false, "Enable scoped IPC restrictions (ABI v6+)")
+	flagSet.Bool("unsafe-host-runtime", false, "Allow read_exec rights for host runtime paths")
 	flagSet.VarP(&mode, "mode", "m", "Execution mode (run|mcp)")
 	flagSet.BoolP("version", "V", false, "Show app version")
 	flagSet.BoolP("help", "h", false, "Show help")
@@ -91,6 +92,9 @@ func Run(argv []string) (int, error) {
 	}
 	if flagSet.Changed("restrict-scoped") {
 		cfg.RestrictScoped, _ = flagSet.GetBool("restrict-scoped")
+	}
+	if flagSet.Changed("unsafe-host-runtime") {
+		cfg.UnsafeHostRuntime, _ = flagSet.GetBool("unsafe-host-runtime")
 	}
 
 	var fsRules []fsRule
@@ -182,6 +186,9 @@ func buildOptions(cfg appConfig, fsRules []fsRule, networkRules []networkRule) [
 	}
 	if cfg.RestrictScoped {
 		opts = append(opts, sandboxec.WithRestrictScoped())
+	}
+	if cfg.UnsafeHostRuntime {
+		opts = append(opts, sandboxec.WithUnsafeHostRuntime())
 	}
 	for _, rule := range fsRules {
 		opts = append(opts, sandboxec.WithFSRule(rule.Path, rule.Rights))

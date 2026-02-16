@@ -50,6 +50,35 @@ func TestRun_ModeMCPWithoutCommand(t *testing.T) {
 	}
 }
 
+func TestRun_ModeMCPUnsafeHostRuntimeOption(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	prev := runMCPServer
+	t.Cleanup(func() {
+		runMCPServer = prev
+	})
+
+	called := false
+	runMCPServer = func(cfg mcp.Config) error {
+		called = true
+		if len(cfg.Options) == 0 {
+			t.Fatal("expected unsafe-host-runtime to produce exec option")
+		}
+		return nil
+	}
+
+	exitCode, err := Run([]string{"--mode", "mcp", "--unsafe-host-runtime"})
+	if exitCode != 0 {
+		t.Fatalf("exitCode = %d, want 0", exitCode)
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatal("expected mcp server to be started")
+	}
+}
+
 func TestRun_ModeMCPRejectsCommandArgs(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
