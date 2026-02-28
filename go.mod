@@ -3,7 +3,7 @@ module go.dw1.io/sandboxec
 go 1.24.0
 
 require (
-	github.com/modelcontextprotocol/go-sdk v1.3.0
+	github.com/modelcontextprotocol/go-sdk v1.3.1
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	go.dw1.io/x/exp/sandboxec v0.0.0-20260216060534-d18485fc1746
@@ -17,6 +17,8 @@ require (
 	github.com/landlock-lsm/go-landlock v0.6.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.3 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
@@ -30,6 +32,4 @@ require (
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
 )
 
-retract (
-	v0.2.0
-)
+retract v0.2.0
