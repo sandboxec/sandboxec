@@ -6,9 +6,9 @@ VERSION ?= $(shell git describe --tags --dirty --match 'v*' --always 2>/dev/null
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || true)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS ?= -s -w \
-	-X go.dw1.io/sandboxec/internal/cli.AppVersion=$(VERSION) \
-	-X go.dw1.io/sandboxec/internal/cli.AppBuildCommit=$(COMMIT) \
-	-X go.dw1.io/sandboxec/internal/cli.AppBuildDate=$(BUILD_DATE)
+	-X go.sandbox.ec/sandboxec/internal/cli.AppVersion=$(VERSION) \
+	-X go.sandbox.ec/sandboxec/internal/cli.AppBuildCommit=$(COMMIT) \
+	-X go.sandbox.ec/sandboxec/internal/cli.AppBuildDate=$(BUILD_DATE)
 
 .PHONY: help build run test test-short test-integration fmt vet tidy install clean
 

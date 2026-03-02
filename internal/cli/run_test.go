@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"go.dw1.io/sandboxec/internal/mcp"
+	"go.sandbox.ec/sandboxec/internal/mcp"
 )
 
 func TestRun_ModeValidation(t *testing.T) {

@@ -1,7 +1,7 @@
 # sandboxec
 
-<a href="https://gh.dw1.io/sandboxec/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/dwisiswant0/sandboxec?color=blueviolet" /></a>
-<a href="https://github.com/dwisiswant0/sandboxec/actions/workflows/tests.yaml"><img alt="tests" src="https://github.com/dwisiswant0/sandboxec/actions/workflows/tests.yaml/badge.svg" /></a>
+<a href="https://github.com/sandboxec/sandboxec/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sandboxec/sandboxec?color=blueviolet" /></a>
+<a href="https://github.com/sandboxec/sandboxec/actions/workflows/tests.yaml"><img alt="tests" src="https://github.com/sandboxec/sandboxec/actions/workflows/tests.yaml/badge.svg" /></a>
 <a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-linux-green" /></a>
 <a href="/LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-yellowgreen" /></a>
 
@@ -83,16 +83,22 @@ Restrictions are applied immediately before launching the target command. Once s
 
 ## Install
 
+* Using script:
+
+  ```bash
+  curl -sSL https://get.sandbox.ec | sh
+  ```
+
 * Using Go compiler:
 
   ```bash
-  go install go.dw1.io/sandboxec@v0.2.1
+  go install go.sandbox.ec/sandboxec@v0.2.1
   ```
 
 > [!NOTE]
 > Requires [Go](https://go.dev/doc/install) 1.24.0 or later.
 
-* Or download a pre-built binary from [releases page](https://gh.dw1.io/sandboxec/releases).
+* Or download a pre-built binary from [releases page](https://github.com/sandboxec/sandboxec/releases).
 
 * Or build from source:
 
@@ -100,7 +106,7 @@ Restrictions are applied immediately before launching the target command. Once s
 > The `master` branch contains the latest code changes and updates, which might not have undergone thorough testing and quality assurance - thus, you may encounter instability or unexpected behavior.
 
   ```bash
-  git clone https://github.com/dwisiswant0/sandboxec.git
+  git clone https://github.com/sandboxec/sandboxec.git
   cd sandboxec/
   # git checkout [VERSION]
   make build

@@ -10,8 +10,8 @@ import (
 	"syscall"
 
 	"github.com/spf13/pflag"
-	"go.dw1.io/sandboxec/internal/mcp"
 	"go.dw1.io/x/exp/sandboxec"
+	"go.sandbox.ec/sandboxec/internal/mcp"
 )
 
 // Run executes the sandboxec CLI workflow.

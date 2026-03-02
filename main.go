@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"go.dw1.io/sandboxec/internal/cli"
+	"go.sandbox.ec/sandboxec/internal/cli"
 )
 
 var (

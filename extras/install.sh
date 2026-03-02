@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="${REPO:-dwisiswant0/sandboxec}"
+REPO="${REPO:-sandboxec/sandboxec}"
 BINARY_NAME="${BINARY_NAME:-sandboxec}"
 INSTALL_DIR="${INSTALL_DIR:-}"
 
@@ -148,7 +148,7 @@ if ! install_to_dir "$target_dir"; then
   fi
 fi
 
-echo "installed: $target_dir/$BINARY_NAME"
+echo "Installed at $target_dir/$BINARY_NAME"
 if ! printf '%s' ":$PATH:" | grep -q ":$target_dir:"; then
   echo "Note: $target_dir is not in PATH"
 fi
