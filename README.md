@@ -92,7 +92,7 @@ Restrictions are applied immediately before launching the target command. Once s
 * Using Go compiler:
 
   ```bash
-  go install go.sandbox.ec/sandboxec@v0.2.1
+  go install go.sandbox.ec/sandboxec@v0.2.2
   ```
 
 > [!NOTE]
@@ -108,7 +108,7 @@ Restrictions are applied immediately before launching the target command. Once s
   ```bash
   git clone https://github.com/sandboxec/sandboxec.git
   cd sandboxec/
-  # git checkout [VERSION]
+  # git checkout v0.2.2
   make build
   # ./bin/sandboxec --help
   ```
