@@ -247,6 +247,10 @@ net:
   - c:443
 ```
 
+### Profiles repository
+
+Looking for ready-made policy profiles? See [sandboxec/profiles](https://github.com/sandboxec/profiles) repository.
+
 ## Exit codes
 
 - `0`: Wrapped command succeeded.
