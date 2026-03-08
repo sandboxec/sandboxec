@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,9 +29,36 @@ func runSandboxec(t *testing.T, args ...string) (string, error) {
 	return string(out), err
 }
 
+func mustFindUnixCmd(t *testing.T, name string) string {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		t.Skipf("%s command lookup is only supported on Unix-like hosts", name)
+	}
+
+	for _, candidate := range []string{
+		filepath.Join("/usr/bin", name),
+		filepath.Join("/bin", name),
+	} {
+		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+			return candidate
+		}
+	}
+
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+
+	t.Fatalf("required command %q not found in /usr/bin, /bin, or PATH", name)
+
+	return ""
+}
+
 func requireSandbox(t *testing.T) {
 	t.Helper()
-	out, err := runSandboxec(t, "--fs", "rx:/", "--", "/bin/true")
+	truePath := mustFindUnixCmd(t, "true")
+
+	out, err := runSandboxec(t, "--fs", "rx:/", "--", truePath)
 	if err != nil {
 		lower := strings.ToLower(out)
 
@@ -67,6 +95,8 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("ArgumentValidation", func(t *testing.T) {
+		truePath := mustFindUnixCmd(t, "true")
+
 		t.Run("MissingCommandFails", func(t *testing.T) {
 			output, err := runSandboxec(t)
 			if err == nil {
@@ -101,7 +131,7 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("InvalidFSRuleRightsFails", func(t *testing.T) {
-			out, err := runSandboxec(t, "--fs", "nope:/tmp", "--", "/bin/true")
+			out, err := runSandboxec(t, "--fs", "nope:/tmp", "--", truePath)
 			if err == nil {
 				t.Fatalf("expected invalid fs rule to fail\noutput:\n%s", out)
 			}
@@ -111,7 +141,7 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("InvalidNetworkRulePortFails", func(t *testing.T) {
-			out, err := runSandboxec(t, "--net", "c:notaport", "--", "/bin/true")
+			out, err := runSandboxec(t, "--net", "c:notaport", "--", truePath)
 			if err == nil {
 				t.Fatalf("expected invalid network port to fail\noutput:\n%s", out)
 			}
@@ -124,10 +154,7 @@ func TestMainIntegration(t *testing.T) {
 	t.Run("FSRules", func(t *testing.T) {
 		requireSandbox(t)
 
-		touchPath, err := exec.LookPath("touch")
-		if err != nil {
-			t.Skip("touch not available")
-		}
+		touchPath := mustFindUnixCmd(t, "touch")
 
 		t.Run("AllowsTmpWrite", func(t *testing.T) {
 			tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))
@@ -175,12 +202,15 @@ func TestMainIntegration(t *testing.T) {
 
 	t.Run("Examples", func(t *testing.T) {
 		requireSandbox(t)
+		echoPath := mustFindUnixCmd(t, "echo")
+		lsPath := mustFindUnixCmd(t, "ls")
+		curlPath := mustFindUnixCmd(t, "curl")
 
 		t.Run("EchoHello", func(t *testing.T) {
 			out, err := runSandboxec(t,
 				"--fs", "rx:/usr",
 				"--",
-				"/usr/bin/echo",
+				echoPath,
 				"hello",
 			)
 			if err != nil {
@@ -195,7 +225,7 @@ func TestMainIntegration(t *testing.T) {
 			out, err := runSandboxec(t,
 				"--fs", "rx:/usr",
 				"--",
-				"/usr/bin/ls",
+				lsPath,
 				"/usr",
 			)
 			if err != nil {
@@ -207,11 +237,6 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("CurlLocalhostWithPortRule", func(t *testing.T) {
-			const curlPath = "/usr/bin/curl"
-			if _, err := os.Stat(curlPath); err != nil {
-				t.Skip("/usr/bin/curl not available")
-			}
-
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("ok"))
 			}))
@@ -246,10 +271,7 @@ func TestMainIntegration(t *testing.T) {
 	t.Run("NetworkRules", func(t *testing.T) {
 		requireSandbox(t)
 
-		curlPath, err := exec.LookPath("curl")
-		if err != nil {
-			t.Skip("curl not available")
-		}
+		curlPath := mustFindUnixCmd(t, "curl")
 
 		t.Run("CurlAllowedPortSucceeds", func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -316,10 +338,7 @@ func TestMainIntegration(t *testing.T) {
 	t.Run("ConfigPrecedence", func(t *testing.T) {
 		requireSandbox(t)
 
-		touchPath, err := exec.LookPath("touch")
-		if err != nil {
-			t.Skip("touch not available")
-		}
+		touchPath := mustFindUnixCmd(t, "touch")
 
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "sandboxec.yaml")
