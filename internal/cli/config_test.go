@@ -23,7 +23,7 @@ func TestLoadConfig_DefaultsWhenMissing(t *testing.T) {
 	if cfg.Mode != "run" {
 		t.Fatalf("unexpected default mode: %q", cfg.Mode)
 	}
-	if cfg.ABI != 0 || cfg.BestEffort || cfg.IgnoreIfMissing || cfg.RestrictScoped || cfg.UnsafeHostRuntime {
+	if cfg.BestEffort || cfg.UnsafeHostRuntime {
 		t.Fatalf("unexpected default scalar config: %+v", cfg)
 	}
 	if len(cfg.FSRules) != 0 || len(cfg.NetworkRules) != 0 {
@@ -36,10 +36,7 @@ func TestLoadConfig_ExplicitYAML(t *testing.T) {
 	path := filepath.Join(dir, "sandboxec.yaml")
 	content := strings.Join([]string{
 		"mode: mcp",
-		"abi: 6",
 		"best-effort: true",
-		"ignore-if-missing: true",
-		"restrict-scoped: true",
 		"unsafe-host-runtime: true",
 		"fs:",
 		"  - rx:/bin",
@@ -59,7 +56,7 @@ func TestLoadConfig_ExplicitYAML(t *testing.T) {
 	if cfg.Mode != "mcp" {
 		t.Fatalf("unexpected mode: %q", cfg.Mode)
 	}
-	if cfg.ABI != 6 || !cfg.BestEffort || !cfg.IgnoreIfMissing || !cfg.RestrictScoped || !cfg.UnsafeHostRuntime {
+	if !cfg.BestEffort || !cfg.UnsafeHostRuntime {
 		t.Fatalf("unexpected scalar config: %+v", cfg)
 	}
 	if !reflect.DeepEqual(cfg.FSRules, []string{"rx:/bin", "rw:/tmp"}) {
@@ -98,7 +95,7 @@ func TestLoadConfig_AutoSearchXDG(t *testing.T) {
 		t.Fatalf("mkdir config dir: %v", err)
 	}
 	path := filepath.Join(dir, "sandboxec.yaml")
-	content := "abi: 5\nfs:\n  - r:/etc\nnet:\n  - c:53\n"
+	content := "fs:\n  - r:/etc\nnet:\n  - c:53\n"
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -106,9 +103,6 @@ func TestLoadConfig_AutoSearchXDG(t *testing.T) {
 	cfg, err := loadConfig("")
 	if err != nil {
 		t.Fatalf("loadConfig auto search failed: %v", err)
-	}
-	if cfg.ABI != 5 {
-		t.Fatalf("expected abi 5, got %d", cfg.ABI)
 	}
 	if !reflect.DeepEqual(cfg.FSRules, []string{"r:/etc"}) {
 		t.Fatalf("fs rules mismatch: %v", cfg.FSRules)
@@ -124,7 +118,7 @@ func TestLoadConfig_RemoteYAML(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		_, _ = w.Write([]byte("mode: mcp\nabi: 4\nfs:\n  - rx:/usr\nnet:\n  - c:443\n"))
+		_, _ = w.Write([]byte("mode: mcp\nfs:\n  - rx:/usr\nnet:\n  - c:443\n"))
 	}))
 	t.Cleanup(server.Close)
 
@@ -135,9 +129,6 @@ func TestLoadConfig_RemoteYAML(t *testing.T) {
 
 	if cfg.Mode != "mcp" {
 		t.Fatalf("unexpected mode: %q", cfg.Mode)
-	}
-	if cfg.ABI != 4 {
-		t.Fatalf("unexpected abi: %d", cfg.ABI)
 	}
 	if !reflect.DeepEqual(cfg.FSRules, []string{"rx:/usr"}) {
 		t.Fatalf("fs rules mismatch: %v", cfg.FSRules)

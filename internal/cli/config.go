@@ -16,10 +16,7 @@ import (
 
 type appConfig struct {
 	Mode              string
-	ABI               int
 	BestEffort        bool
-	IgnoreIfMissing   bool
-	RestrictScoped    bool
 	UnsafeHostRuntime bool
 	FSRules           []string
 	NetworkRules      []string
@@ -29,10 +26,7 @@ func loadConfig(configPath string) (appConfig, error) {
 	cfg := appConfig{}
 	v := viper.New()
 	v.SetDefault("mode", "run")
-	v.SetDefault("abi", 0)
 	v.SetDefault("best-effort", false)
-	v.SetDefault("ignore-if-missing", false)
-	v.SetDefault("restrict-scoped", false)
 	v.SetDefault("unsafe-host-runtime", false)
 	v.SetDefault("fs", []string{})
 	v.SetDefault("net", []string{})
@@ -73,10 +67,7 @@ func loadConfig(configPath string) (appConfig, error) {
 	if cfg.Mode == "" {
 		cfg.Mode = "run"
 	}
-	cfg.ABI = v.GetInt("abi")
 	cfg.BestEffort = v.GetBool("best-effort")
-	cfg.IgnoreIfMissing = v.GetBool("ignore-if-missing")
-	cfg.RestrictScoped = v.GetBool("restrict-scoped")
 	cfg.UnsafeHostRuntime = v.GetBool("unsafe-host-runtime")
 	cfg.FSRules = append([]string(nil), v.GetStringSlice("fs")...)
 	cfg.NetworkRules = append([]string(nil), v.GetStringSlice("net")...)

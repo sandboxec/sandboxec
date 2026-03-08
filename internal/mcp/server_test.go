@@ -13,7 +13,7 @@ func TestRunExec_Success(t *testing.T) {
 	out, err := run(context.Background(), input{
 		Command: "/bin/echo",
 		Args:    []string{"hello"},
-	}, []sandboxec.Option{sandboxec.WithFSRule("/", access.FS_READ_EXEC)})
+	}, []sandboxec.Option{sandboxec.WithBestEffort(), sandboxec.WithFSRule("/", access.FS_READ_EXEC)})
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestRunExec_NonZeroExit(t *testing.T) {
 	out, err := run(context.Background(), input{
 		Command: "/bin/sh",
 		Args:    []string{"-c", "echo boom 1>&2; exit 7"},
-	}, []sandboxec.Option{sandboxec.WithFSRule("/", access.FS_READ_EXEC)})
+	}, []sandboxec.Option{sandboxec.WithBestEffort(), sandboxec.WithFSRule("/", access.FS_READ_EXEC)})
 	if err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}

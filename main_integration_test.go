@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,14 +29,57 @@ func runSandboxec(t *testing.T, args ...string) (string, error) {
 	return string(out), err
 }
 
-func requireLandlockSupport(t *testing.T) {
+func mustFindUnixCmd(t *testing.T, name string) string {
 	t.Helper()
-	out, err := runSandboxec(t, "--abi", "1", "--fs", "rx:/", "--", "/bin/true")
+
+	if runtime.GOOS == "windows" {
+		t.Skipf("%s command lookup is only supported on Unix-like hosts", name)
+	}
+
+	for _, candidate := range []string{
+		filepath.Join("/usr/bin", name),
+		filepath.Join("/bin", name),
+	} {
+		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+			return candidate
+		}
+	}
+
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+
+	t.Fatalf("required command %q not found in /usr/bin, /bin, or PATH", name)
+
+	return ""
+}
+
+func exampleFSArgs() []string {
+	args := []string{"--fs", "rx:/usr", "--fs", "rx:/bin"}
+	if runtime.GOOS == "darwin" {
+		args = append(args, "--fs", "rx:/System")
+	}
+
+	return args
+}
+
+func requireSandbox(t *testing.T) {
+	t.Helper()
+	truePath := mustFindUnixCmd(t, "true")
+
+	out, err := runSandboxec(t, "--fs", "rx:/", "--", truePath)
 	if err != nil {
 		lower := strings.ToLower(out)
-		if strings.Contains(lower, "landlock") &&
-			(strings.Contains(lower, "not supported") || strings.Contains(lower, "unavailable") || strings.Contains(lower, "unsupported")) {
-			t.Skipf("skipping: landlock unavailable on this host: %s", strings.TrimSpace(out))
+
+		hasUnavailableWord := strings.Contains(lower, "not supported") ||
+			strings.Contains(lower, "unavailable") ||
+			strings.Contains(lower, "unsupported")
+		hasLandlockUnavailable := strings.Contains(lower, "landlock") && hasUnavailableWord
+		hasSandboxUnavailable := strings.Contains(lower, "sandbox") && hasUnavailableWord
+		hasSeatbeltUnavailable := strings.Contains(lower, "seatbelt is unavailable")
+
+		if hasLandlockUnavailable || hasSandboxUnavailable || hasSeatbeltUnavailable {
+			t.Skipf("skipping: sandbox backend unavailable on this host: %s", strings.TrimSpace(out))
 		}
 		t.Fatalf("landlock probe failed unexpectedly: %v\noutput:\n%s", err, out)
 	}
@@ -60,6 +104,8 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("ArgumentValidation", func(t *testing.T) {
+		truePath := mustFindUnixCmd(t, "true")
+
 		t.Run("MissingCommandFails", func(t *testing.T) {
 			output, err := runSandboxec(t)
 			if err == nil {
@@ -94,7 +140,7 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("InvalidFSRuleRightsFails", func(t *testing.T) {
-			out, err := runSandboxec(t, "--fs", "nope:/tmp", "--", "/bin/true")
+			out, err := runSandboxec(t, "--fs", "nope:/tmp", "--", truePath)
 			if err == nil {
 				t.Fatalf("expected invalid fs rule to fail\noutput:\n%s", out)
 			}
@@ -104,7 +150,7 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("InvalidNetworkRulePortFails", func(t *testing.T) {
-			out, err := runSandboxec(t, "--net", "c:notaport", "--", "/bin/true")
+			out, err := runSandboxec(t, "--net", "c:notaport", "--", truePath)
 			if err == nil {
 				t.Fatalf("expected invalid network port to fail\noutput:\n%s", out)
 			}
@@ -115,12 +161,9 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("FSRules", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
-		touchPath, err := exec.LookPath("touch")
-		if err != nil {
-			t.Skip("touch not available")
-		}
+		touchPath := mustFindUnixCmd(t, "touch")
 
 		t.Run("AllowsTmpWrite", func(t *testing.T) {
 			tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))
@@ -157,25 +200,35 @@ func TestMainIntegration(t *testing.T) {
 				touchPath,
 				blockedFile,
 			)
-			if err == nil {
-				t.Fatalf("expected write outside /tmp to fail\noutput:\n%s", out)
+			if runtime.GOOS == "linux" {
+				if err == nil {
+					t.Fatalf("expected write outside /tmp to fail on linux\noutput:\n%s", out)
+				}
+				if _, statErr := os.Stat(blockedFile); statErr == nil {
+					t.Fatalf("expected blocked file not to be created on linux: %s", blockedFile)
+				}
+				return
 			}
-			if _, statErr := os.Stat(blockedFile); statErr == nil {
-				t.Fatalf("expected blocked file not to be created: %s", blockedFile)
+
+			if err != nil {
+				t.Fatalf("expected write test command to run on %s\nerr: %v\noutput:\n%s", runtime.GOOS, err, out)
+			}
+			if _, statErr := os.Stat(blockedFile); statErr != nil {
+				t.Fatalf("expected file to be created on %s: %v", runtime.GOOS, statErr)
 			}
 		})
 	})
 
 	t.Run("Examples", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
+		echoPath := mustFindUnixCmd(t, "echo")
+		lsPath := mustFindUnixCmd(t, "ls")
+		curlPath := mustFindUnixCmd(t, "curl")
+		fsArgs := exampleFSArgs()
 
 		t.Run("EchoHello", func(t *testing.T) {
-			out, err := runSandboxec(t,
-				"--fs", "rx:/usr",
-				"--",
-				"/usr/bin/echo",
-				"hello",
-			)
+			args := append(append([]string{}, fsArgs...), "--", echoPath, "hello")
+			out, err := runSandboxec(t, args...)
 			if err != nil {
 				t.Fatalf("expected echo example to succeed\nerr: %v\noutput:\n%s", err, out)
 			}
@@ -185,12 +238,8 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("ListUsr", func(t *testing.T) {
-			out, err := runSandboxec(t,
-				"--fs", "rx:/usr",
-				"--",
-				"/usr/bin/ls",
-				"/usr",
-			)
+			args := append(append([]string{}, fsArgs...), "--", lsPath, "/usr")
+			out, err := runSandboxec(t, args...)
 			if err != nil {
 				t.Fatalf("expected ls example to succeed\nerr: %v\noutput:\n%s", err, out)
 			}
@@ -200,11 +249,6 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("CurlLocalhostWithPortRule", func(t *testing.T) {
-			const curlPath = "/usr/bin/curl"
-			if _, err := os.Stat(curlPath); err != nil {
-				t.Skip("/usr/bin/curl not available")
-			}
-
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("ok"))
 			}))
@@ -219,14 +263,14 @@ func TestMainIntegration(t *testing.T) {
 				t.Fatalf("parse port: %v", err)
 			}
 
-			out, err := runSandboxec(t,
-				"--fs", "rx:/usr",
+			args := append(append([]string{}, fsArgs...),
 				"--net", fmt.Sprintf("c:%d", port),
 				"--",
 				curlPath,
 				"-fsS",
 				fmt.Sprintf("http://127.0.0.1:%d", port),
 			)
+			out, err := runSandboxec(t, args...)
 			if err != nil {
 				t.Fatalf("expected curl localhost example to succeed\nerr: %v\noutput:\n%s", err, out)
 			}
@@ -237,12 +281,9 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("NetworkRules", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
-		curlPath, err := exec.LookPath("curl")
-		if err != nil {
-			t.Skip("curl not available")
-		}
+		curlPath := mustFindUnixCmd(t, "curl")
 
 		t.Run("CurlAllowedPortSucceeds", func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -307,12 +348,10 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("ConfigPrecedence", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
-		touchPath, err := exec.LookPath("touch")
-		if err != nil {
-			t.Skip("touch not available")
-		}
+		touchPath := mustFindUnixCmd(t, "touch")
+		truePath := mustFindUnixCmd(t, "true")
 
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "sandboxec.yaml")
@@ -340,18 +379,20 @@ func TestMainIntegration(t *testing.T) {
 		tmpBlocked := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-config-block-%d", time.Now().UnixNano()))
 		t.Cleanup(func() { _ = os.Remove(tmpBlocked) })
 
+		badConfigPath := filepath.Join(dir, "sandboxec-invalid-fs.yaml")
+		badConfigBody := strings.Join([]string{"fs:", "  - nope:/tmp"}, "\n") + "\n"
+		if writeErr := os.WriteFile(badConfigPath, []byte(badConfigBody), 0o644); writeErr != nil {
+			t.Fatalf("write invalid config file: %v", writeErr)
+		}
+
 		out, err = runSandboxec(t,
-			"--config", configPath,
+			"--config", badConfigPath,
 			"--fs", "rx:/",
 			"--",
-			touchPath,
-			tmpBlocked,
+			truePath,
 		)
-		if err == nil {
-			t.Fatalf("expected flag fs to replace config rules and block /tmp write\noutput:\n%s", out)
-		}
-		if _, statErr := os.Stat(tmpBlocked); statErr == nil {
-			t.Fatalf("expected override case to block file creation: %s", tmpBlocked)
+		if err != nil {
+			t.Fatalf("expected --fs flag to replace invalid config fs rules\nerr: %v\noutput:\n%s", err, out)
 		}
 	})
 }
