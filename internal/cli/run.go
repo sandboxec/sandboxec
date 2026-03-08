@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -45,10 +46,7 @@ func Run(argv []string) (int, error) {
 	flagSet.StringVarP(&namedConfig, "named-config", "C", "", "Named config profile (mapped to sandboxec/profiles repository)")
 	flagSet.VarP(&fsFlag, "fs", "f", "Filesystem rule (repeatable)")
 	flagSet.VarP(&networkFlag, "net", "n", "Network rule (repeatable)")
-	flagSet.Int("abi", 0, "Landlock ABI version (1-6, 0 means default)")
-	flagSet.Bool("best-effort", false, "Ignore unsupported ABI/Landlock availability")
-	flagSet.Bool("ignore-if-missing", false, "Ignore missing fs rule paths")
-	flagSet.Bool("restrict-scoped", false, "Enable scoped IPC restrictions (ABI v6+)")
+	flagSet.Bool("best-effort", false, "Ignore unsupported sandbox feature availability")
 	flagSet.Bool("unsafe-host-runtime", false, "Allow read_exec rights for host runtime paths")
 	flagSet.VarP(&mode, "mode", "m", "Execution mode (run|mcp)")
 	flagSet.BoolP("version", "V", false, "Show app version")
@@ -97,17 +95,8 @@ func Run(argv []string) (int, error) {
 		return 1, fmt.Errorf("invalid mode %q (valid: run|mcp)", cfg.Mode)
 	}
 
-	if flagSet.Changed("abi") {
-		cfg.ABI, _ = flagSet.GetInt("abi")
-	}
 	if flagSet.Changed("best-effort") {
 		cfg.BestEffort, _ = flagSet.GetBool("best-effort")
-	}
-	if flagSet.Changed("ignore-if-missing") {
-		cfg.IgnoreIfMissing, _ = flagSet.GetBool("ignore-if-missing")
-	}
-	if flagSet.Changed("restrict-scoped") {
-		cfg.RestrictScoped, _ = flagSet.GetBool("restrict-scoped")
 	}
 	if flagSet.Changed("unsafe-host-runtime") {
 		cfg.UnsafeHostRuntime, _ = flagSet.GetBool("unsafe-host-runtime")
@@ -190,18 +179,12 @@ var runMCPServer = func(cfg mcp.Config) error {
 }
 
 func buildOptions(cfg appConfig, fsRules []fsRule, networkRules []networkRule) []sandboxec.Option {
-	opts := make([]sandboxec.Option, 0, 4+len(fsRules)+len(networkRules))
-	if cfg.ABI != 0 {
-		opts = append(opts, sandboxec.WithABI(cfg.ABI))
-	}
+	opts := make([]sandboxec.Option, 0, 3+len(fsRules)+len(networkRules))
 	if cfg.BestEffort {
 		opts = append(opts, sandboxec.WithBestEffort())
 	}
-	if cfg.IgnoreIfMissing {
+	if runtime.GOOS == "linux" {
 		opts = append(opts, sandboxec.WithIgnoreIfMissing())
-	}
-	if cfg.RestrictScoped {
-		opts = append(opts, sandboxec.WithRestrictScoped())
 	}
 	if cfg.UnsafeHostRuntime {
 		opts = append(opts, sandboxec.WithUnsafeHostRuntime())

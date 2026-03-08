@@ -28,14 +28,21 @@ func runSandboxec(t *testing.T, args ...string) (string, error) {
 	return string(out), err
 }
 
-func requireLandlockSupport(t *testing.T) {
+func requireSandbox(t *testing.T) {
 	t.Helper()
-	out, err := runSandboxec(t, "--abi", "1", "--fs", "rx:/", "--", "/bin/true")
+	out, err := runSandboxec(t, "--fs", "rx:/", "--", "/bin/true")
 	if err != nil {
 		lower := strings.ToLower(out)
-		if strings.Contains(lower, "landlock") &&
-			(strings.Contains(lower, "not supported") || strings.Contains(lower, "unavailable") || strings.Contains(lower, "unsupported")) {
-			t.Skipf("skipping: landlock unavailable on this host: %s", strings.TrimSpace(out))
+
+		hasUnavailableWord := strings.Contains(lower, "not supported") ||
+			strings.Contains(lower, "unavailable") ||
+			strings.Contains(lower, "unsupported")
+		hasLandlockUnavailable := strings.Contains(lower, "landlock") && hasUnavailableWord
+		hasSandboxUnavailable := strings.Contains(lower, "sandbox") && hasUnavailableWord
+		hasSeatbeltUnavailable := strings.Contains(lower, "seatbelt is unavailable")
+
+		if hasLandlockUnavailable || hasSandboxUnavailable || hasSeatbeltUnavailable {
+			t.Skipf("skipping: sandbox backend unavailable on this host: %s", strings.TrimSpace(out))
 		}
 		t.Fatalf("landlock probe failed unexpectedly: %v\noutput:\n%s", err, out)
 	}
@@ -115,7 +122,7 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("FSRules", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
 		touchPath, err := exec.LookPath("touch")
 		if err != nil {
@@ -167,7 +174,7 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("Examples", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
 		t.Run("EchoHello", func(t *testing.T) {
 			out, err := runSandboxec(t,
@@ -237,7 +244,7 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("NetworkRules", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
 		curlPath, err := exec.LookPath("curl")
 		if err != nil {
@@ -307,7 +314,7 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("ConfigPrecedence", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
 		touchPath, err := exec.LookPath("touch")
 		if err != nil {
