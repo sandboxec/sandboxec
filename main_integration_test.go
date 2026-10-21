@@ -57,7 +57,8 @@ func mustFindUnixCmd(t *testing.T, name string) string {
 func exampleFSArgs() []string {
 	args := []string{"--fs", "rx:/usr", "--fs", "rx:/bin"}
 	if runtime.GOOS == "darwin" {
-		args = append(args, "--fs", "rx:/System")
+		// macOS curl links LibreSSL, which fails when openssl.cnf is unreadable.
+		args = append(args, "--fs", "r:/etc/ssl")
 	}
 
 	return args
@@ -166,7 +167,7 @@ func TestMainIntegration(t *testing.T) {
 		touchPath := mustFindUnixCmd(t, "touch")
 
 		t.Run("AllowsTmpWrite", func(t *testing.T) {
-			tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))
+			tmpFile := filepath.Join("/tmp", fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))
 			t.Cleanup(func() { _ = os.Remove(tmpFile) })
 
 			out, err := runSandboxec(t,
@@ -200,21 +201,11 @@ func TestMainIntegration(t *testing.T) {
 				touchPath,
 				blockedFile,
 			)
-			if runtime.GOOS == "linux" {
-				if err == nil {
-					t.Fatalf("expected write outside /tmp to fail on linux\noutput:\n%s", out)
-				}
-				if _, statErr := os.Stat(blockedFile); statErr == nil {
-					t.Fatalf("expected blocked file not to be created on linux: %s", blockedFile)
-				}
-				return
+			if err == nil {
+				t.Fatalf("expected write outside /tmp to fail\noutput:\n%s", out)
 			}
-
-			if err != nil {
-				t.Fatalf("expected write test command to run on %s\nerr: %v\noutput:\n%s", runtime.GOOS, err, out)
-			}
-			if _, statErr := os.Stat(blockedFile); statErr != nil {
-				t.Fatalf("expected file to be created on %s: %v", runtime.GOOS, statErr)
+			if _, statErr := os.Stat(blockedFile); statErr == nil {
+				t.Fatalf("expected blocked file not to be created: %s", blockedFile)
 			}
 		})
 	})
@@ -360,7 +351,7 @@ func TestMainIntegration(t *testing.T) {
 			t.Fatalf("write config file: %v", writeErr)
 		}
 
-		tmpAllowed := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-config-allow-%d", time.Now().UnixNano()))
+		tmpAllowed := filepath.Join("/tmp", fmt.Sprintf("sandboxec-config-allow-%d", time.Now().UnixNano()))
 		t.Cleanup(func() { _ = os.Remove(tmpAllowed) })
 
 		out, err := runSandboxec(t,
@@ -375,9 +366,6 @@ func TestMainIntegration(t *testing.T) {
 		if _, statErr := os.Stat(tmpAllowed); statErr != nil {
 			t.Fatalf("expected file created via config-based rules: %v", statErr)
 		}
-
-		tmpBlocked := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-config-block-%d", time.Now().UnixNano()))
-		t.Cleanup(func() { _ = os.Remove(tmpBlocked) })
 
 		badConfigPath := filepath.Join(dir, "sandboxec-invalid-fs.yaml")
 		badConfigBody := strings.Join([]string{"fs:", "  - nope:/tmp"}, "\n") + "\n"
