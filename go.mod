@@ -6,7 +6,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.4.0
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	go.dw1.io/x/exp/sandboxec v0.0.0-20261021150301-e3a94b438c3f
+	go.dw1.io/x/exp/sandboxec v0.0.0-20261021210621-cb84a661e280
 )
 
 require (
