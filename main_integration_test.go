@@ -165,6 +165,26 @@ func TestMainIntegration(t *testing.T) {
 		requireSandbox(t)
 
 		touchPath := mustFindUnixCmd(t, "touch")
+		catPath := mustFindUnixCmd(t, "cat")
+
+		t.Run("DeniesReadWithoutRules", func(t *testing.T) {
+			secret := filepath.Join(t.TempDir(), "secret.txt")
+			if err := os.WriteFile(secret, []byte("sandboxec-secret\n"), 0o600); err != nil {
+				t.Fatalf("write secret file: %v", err)
+			}
+
+			out, err := runSandboxec(t, "--", catPath, secret)
+			if err == nil || strings.Contains(out, "sandboxec-secret") {
+				t.Fatalf("expected read without rules to be denied\nerr: %v\noutput:\n%s", err, out)
+			}
+
+			// Both platforms deny the exec: "permission denied" on Linux,
+			// "operation not permitted" on darwin.
+			lower := strings.ToLower(out)
+			if !strings.Contains(lower, "permission denied") && !strings.Contains(lower, "operation not permitted") {
+				t.Fatalf("expected a permission denial\nerr: %v\noutput:\n%s", err, out)
+			}
+		})
 
 		t.Run("AllowsTmpWrite", func(t *testing.T) {
 			tmpFile := filepath.Join("/tmp", fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))

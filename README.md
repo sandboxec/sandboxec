@@ -193,6 +193,7 @@ Accepted rights:
 - Rules are allow-list based: if it is not allowed, it is denied. It is what it is.
 - Multiple `--fs` and `--net` entries are cumulative.
 - Rules should include every runtime dependency your command needs.
+- Without `--fs` rules, the command cannot read, write, or even start, including when `--net` rules are set. Grant `rx` on the command's directory (on macOS, `echo`, `cat`, and `sh` live in `/bin`).
 
 ## Configuration
 
