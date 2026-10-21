@@ -64,6 +64,8 @@ go.dw1.io/x/exp/sandboxec v0.0.0-20260308065823-666e0c2272c7 h1:+EUkODHdJXN4mLfH
 go.dw1.io/x/exp/sandboxec v0.0.0-20260308065823-666e0c2272c7/go.mod h1:MaIrP1dosvNaC1tAiG/i5ixt4gsQbKPI5KyhFL/qDqU=
 go.dw1.io/x/exp/sandboxec v0.0.0-20260308123118-81469546c0d8 h1:mCDiyYUEKKQc8hWPI1+/iBVLJ/vUamy2JtKSN6AAuVk=
 go.dw1.io/x/exp/sandboxec v0.0.0-20260308123118-81469546c0d8/go.mod h1:MaIrP1dosvNaC1tAiG/i5ixt4gsQbKPI5KyhFL/qDqU=
+go.dw1.io/x/exp/sandboxec v0.0.0-20261021150301-e3a94b438c3f h1:ZluuUH5bcKnSvd7R0l13cGuM90d97rt975UHJZMswm4=
+go.dw1.io/x/exp/sandboxec v0.0.0-20261021150301-e3a94b438c3f/go.mod h1:MaIrP1dosvNaC1tAiG/i5ixt4gsQbKPI5KyhFL/qDqU=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
 golang.org/x/oauth2 v0.34.0 h1:hqK/t4AKgbqWkdkcAeI8XLmbK+4m4G5YeQRrmiotGlw=
