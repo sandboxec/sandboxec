@@ -182,3 +182,71 @@ func TestRun_ConfigAndNamedConfigMutuallyExclusive(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestBuildOptions_PlatformSettings(t *testing.T) {
+	tests := []struct {
+		name        string
+		goos        string
+		cfg         appConfig
+		wantOpts    int
+		wantWarning string
+		wantErr     string
+	}{
+		{
+			name:     "linux-applies-landlock-settings",
+			goos:     "linux",
+			cfg:      appConfig{ABI: 6, RestrictScoped: true},
+			wantOpts: 3,
+		},
+		{
+			name: "darwin-defaults",
+			goos: "darwin",
+		},
+		{
+			name:        "darwin-warns-on-abi",
+			goos:        "darwin",
+			cfg:         appConfig{ABI: 6},
+			wantWarning: "abi 6 is ignored on darwin",
+		},
+		{
+			name:    "darwin-rejects-restrict-scoped",
+			goos:    "darwin",
+			cfg:     appConfig{RestrictScoped: true},
+			wantErr: "restrict-scoped is unsupported on darwin",
+		},
+		{
+			name:        "warns-on-ignore-if-missing-false",
+			goos:        "linux",
+			cfg:         appConfig{FailIfMissing: true},
+			wantOpts:    1,
+			wantWarning: "ignore-if-missing: false is ignored",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts, warnings, err := buildOptions(tt.cfg, tt.goos, nil, nil)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("err = %v, want it to contain %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(opts) != tt.wantOpts {
+				t.Fatalf("len(opts) = %d, want %d", len(opts), tt.wantOpts)
+			}
+			if tt.wantWarning == "" {
+				if len(warnings) != 0 {
+					t.Fatalf("unexpected warnings: %q", warnings)
+				}
+				return
+			}
+			if len(warnings) != 1 || !strings.Contains(warnings[0], tt.wantWarning) {
+				t.Fatalf("warnings = %q, want one containing %q", warnings, tt.wantWarning)
+			}
+		})
+	}
+}

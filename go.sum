@@ -54,8 +54,8 @@ github.com/yosida95/uritemplate/v3 v3.0.2 h1:Ed3Oyj9yrmi9087+NczuL5BwkIc4wvTb5zI
 github.com/yosida95/uritemplate/v3 v3.0.2/go.mod h1:ILOh0sOhIJR3+L/8afwt/kE++YT040gmv5BQTMR2HP4=
 go.dw1.io/fastcache v0.2.0 h1:IMR01rKe2DMkY2lIC8QwMDRhelX7VwABKlmSi45tzWM=
 go.dw1.io/fastcache v0.2.0/go.mod h1:VBo/z/zNpd9ox3ag0t6JRmKTc3+kzyhZ9YibAEoMD1s=
-go.dw1.io/x/exp/sandboxec v0.0.0-20261021210621-cb84a661e280 h1:2PHs5BY1DTswXYlo9saWS6QjmL03XZm5AI4lsjGivzI=
-go.dw1.io/x/exp/sandboxec v0.0.0-20261021210621-cb84a661e280/go.mod h1:MaIrP1dosvNaC1tAiG/i5ixt4gsQbKPI5KyhFL/qDqU=
+go.dw1.io/x/exp/sandboxec v0.0.0-20261022031204-3c0461ea3f7e h1:goHKyBoXyK35n58X4cNJIHa1bHCOXPc00ob8qCTnEOc=
+go.dw1.io/x/exp/sandboxec v0.0.0-20261022031204-3c0461ea3f7e/go.mod h1:MaIrP1dosvNaC1tAiG/i5ixt4gsQbKPI5KyhFL/qDqU=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
 golang.org/x/oauth2 v0.34.0 h1:hqK/t4AKgbqWkdkcAeI8XLmbK+4m4G5YeQRrmiotGlw=

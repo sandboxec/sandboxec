@@ -35,13 +35,13 @@ run:
 	$(GO) run . $(ARGS)
 
 test:
-	CGO_ENABLED=0 $(GO) test -v ./...
+	$(GO) test -race -v ./...
 
 test-short:
-	CGO_ENABLED=0 $(GO) test -short ./...
+	$(GO) test -short ./...
 
 test-integration:
-	CGO_ENABLED=0 $(GO) test -run TestMainIntegration .
+	$(GO) test -run TestMainIntegration .
 
 fmt:
 	$(GO) fmt ./...

@@ -25,6 +25,8 @@ func runSandboxec(t *testing.T, args ...string) (string, error) {
 	cmdArgs := append([]string{"run", "."}, args...)
 	cmd := exec.Command("go", cmdArgs...)
 	cmd.Dir = wd
+	// Build the binary under test like releases are built.
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
@@ -100,6 +102,14 @@ func TestMainIntegration(t *testing.T) {
 		for _, want := range []string{"Usage:", "Options:", "Rights:", "Examples:", "--mode", "--fs", "--net"} {
 			if !strings.Contains(output, want) {
 				t.Fatalf("help output missing %q\noutput:\n%s", want, output)
+			}
+		}
+
+		// Landlock-only flags stay accepted but are hidden off Linux.
+		wantLandlockFlags := runtime.GOOS == "linux"
+		for _, flag := range []string{"--abi", "--restrict-scoped"} {
+			if got := strings.Contains(output, flag); got != wantLandlockFlags {
+				t.Fatalf("help output lists %s = %t, want %t\noutput:\n%s", flag, got, wantLandlockFlags, output)
 			}
 		}
 	})
@@ -402,5 +412,60 @@ func TestMainIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected --fs flag to replace invalid config fs rules\nerr: %v\noutput:\n%s", err, out)
 		}
+	})
+
+	t.Run("LandlockOnlySettings", func(t *testing.T) {
+		requireSandbox(t)
+
+		truePath := mustFindUnixCmd(t, "true")
+		isLinux := runtime.GOOS == "linux"
+
+		t.Run("ConfigSettingsAreReported", func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "sandboxec.yaml")
+			configBody := strings.Join([]string{"abi: 1", "ignore-if-missing: false", "fs:", "  - rx:/"}, "\n") + "\n"
+			if writeErr := os.WriteFile(configPath, []byte(configBody), 0o644); writeErr != nil {
+				t.Fatalf("write config file: %v", writeErr)
+			}
+
+			out, err := runSandboxec(t, "--config", configPath, "--", truePath)
+			if err != nil {
+				t.Fatalf("expected config with landlock-only settings to run\nerr: %v\noutput:\n%s", err, out)
+			}
+			if !strings.Contains(out, "warning: ignore-if-missing: false is ignored") {
+				t.Fatalf("expected ignore-if-missing warning\noutput:\n%s", out)
+			}
+			if got := strings.Contains(out, "warning: abi 1 is ignored"); got == isLinux {
+				t.Fatalf("abi warning shown = %t, want %t\noutput:\n%s", got, !isLinux, out)
+			}
+		})
+
+		t.Run("ConfigABIAppliesOnLinux", func(t *testing.T) {
+			if !isLinux {
+				t.Skip("abi is ignored off linux")
+			}
+
+			// ABI 1 predates network rules, so this fails only if abi reached Landlock.
+			configPath := filepath.Join(t.TempDir(), "sandboxec.yaml")
+			configBody := strings.Join([]string{"abi: 1", "fs:", "  - rx:/", "net:", "  - c:443"}, "\n") + "\n"
+			if writeErr := os.WriteFile(configPath, []byte(configBody), 0o644); writeErr != nil {
+				t.Fatalf("write config file: %v", writeErr)
+			}
+
+			out, err := runSandboxec(t, "--config", configPath, "--", truePath)
+			if err == nil || !strings.Contains(out, "network rules require ABI V4+") {
+				t.Fatalf("expected config abi 1 to reject network rules\nerr: %v\noutput:\n%s", err, out)
+			}
+		})
+
+		t.Run("RestrictScopedFailsOffLinux", func(t *testing.T) {
+			if isLinux {
+				t.Skip("restrict-scoped is supported on linux")
+			}
+
+			out, err := runSandboxec(t, "--restrict-scoped", "--fs", "rx:/", "--", truePath)
+			if err == nil || !strings.Contains(out, "restrict-scoped is unsupported") {
+				t.Fatalf("expected restrict-scoped to fail off linux\nerr: %v\noutput:\n%s", err, out)
+			}
+		})
 	})
 }

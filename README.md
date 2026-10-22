@@ -63,6 +63,7 @@ Use containers or VMs for those cases.
 | --- | --- | --- |
 | Filesystem restrictions | v1+ | 5.13+ |
 | TCP bind/connect restrictions | v4+ | 6.7+ |
+| Scoped restrictions (`--restrict-scoped`) | v6+ | newer kernels only |
 
 ## Security model
 
@@ -105,9 +106,6 @@ Restrictions are applied immediately before launching the target command. Once s
 > [!WARNING]
 > The `master` branch contains the latest code changes and updates, which might not have undergone thorough testing and quality assurance - thus, you may encounter instability or unexpected behavior.
 
-> [!TIP]
-> On Darwin, build with `CGO_ENABLED=0`.
-
   ```bash
   git clone https://github.com/sandboxec/sandboxec.git
   cd sandboxec/
@@ -139,7 +137,9 @@ sandboxec --mode mcp --fs rx:/usr --fs rw:$PWD --net c:443
 | `-C, --named-config` | Named config profile (mapped to sandboxec/profiles repository). |
 | `-f, --fs RIGHTS:PATH` | Add filesystem rule (repeatable). |
 | `-n, --net RIGHTS:PORT` | Add network rule (repeatable). |
+| `--abi int` | Force specific Landlock ABI version (0 for default). Linux only. |
 | `--best-effort` | Continue even if the kernel lacks support for some features. |
+| `--restrict-scoped` | Enable scoped IPC restrictions (requires ABI v6+). Linux only. |
 | `--unsafe-host-runtime` | Allow read_exec rights for host runtime paths. |
 | `-m, --mode string` | Execution mode (`run` or `mcp`). Default: `run`. |
 | `-V, --version` | Show app version. |
@@ -152,6 +152,8 @@ Available MCP tools:
   - Execution path uses `sandboxec` runtime with effective policy derived from CLI flags or YAML config.
 
 > [!NOTE]
+> * `--restrict-scoped` requires Landlock ABI v6+.
+> * `--abi` and `--restrict-scoped` are hidden on other platforms. There, `abi` is ignored with a warning, and `restrict-scoped` fails instead of running without the restriction.
 > * `--unsafe-host-runtime` broadens allowed runtime & library access and weakens least-privilege guarantees.
 > * In `--mode mcp`, no wrapped command arguments are accepted.
 
@@ -202,7 +204,9 @@ Configuration is YAML-only.
 ### Keys
 
 ```yaml
+abi: 6 # Linux only
 best-effort: false
+restrict-scoped: false # Linux only
 unsafe-host-runtime: false
 fs:
   - rx:/bin
@@ -210,6 +214,9 @@ net:
   - c:443
 mode: run
 ```
+
+> [!NOTE]
+> `ignore-if-missing` is no longer configurable: fs rules with missing paths never fail. Setting it to `false` prints a warning.
 
 ### Config lookup
 
