@@ -4,7 +4,8 @@ before:
   hooks: ["go mod verify"]
 
 builds:
-  - env: ["CGO_ENABLED=0"]
+  - id: linux
+    env: ["CGO_ENABLED=0"]
     goos: ["linux"]
     goarch:
       - "386"
@@ -20,6 +21,18 @@ builds:
       - ppc64le
       - riscv64
       - s390x
+    ldflags:
+      - -s -w
+      - -X {{ .ModulePath }}/internal/cli.AppVersion={{ .Tag }}
+      - -X {{ .ModulePath }}/internal/cli.AppBuildCommit={{ .FullCommit }}
+      - -X {{ .ModulePath }}/internal/cli.AppBuildDate={{ .Date }}
+
+  - id: darwin
+    env: ["CGO_ENABLED=0"]
+    goos: ["darwin"]
+    goarch:
+      - amd64
+      - arm64
     ldflags:
       - -s -w
       - -X {{ .ModulePath }}/internal/cli.AppVersion={{ .Tag }}

@@ -2,12 +2,12 @@
 
 <a href="https://github.com/sandboxec/sandboxec/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sandboxec/sandboxec?color=blueviolet" /></a>
 <a href="https://github.com/sandboxec/sandboxec/actions/workflows/tests.yaml"><img alt="tests" src="https://github.com/sandboxec/sandboxec/actions/workflows/tests.yaml/badge.svg" /></a>
-<a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-linux-green" /></a>
+<a href="#"><img alt="Platform" src="https://img.shields.io/badge/platform-linux%20%7C%20darwin-green" /></a>
 <a href="/LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-yellowgreen" /></a>
 
 <img height="122" alt="sandboxec" href="#" src="https://github.com/user-attachments/assets/fe4a25bd-b317-4c3a-a5a9-a0a1a3d031c2" />
 
-A lightweight command sandbox for Linux, built on Landlock.
+A lightweight command sandboxer, secure-by-default.
 
 <img src="https://github.com/user-attachments/assets/2ff92aaa-7596-452f-a745-c0ae1e67f63f" href="#" height="280">
 
@@ -45,7 +45,7 @@ Good fit:
 
 ## When't?
 
-- You need stronger isolation boundaries than Landlock process sandboxing.
+- You need stronger isolation boundaries than process-level sandboxing.
 - You need multi-tenant isolation between untrusted users/workloads.
 - You need resource isolation/quotas (CPU, memory, disk, I/O).
 - You need custom root filesystems, full runtime images, or OS-level virtualization.
@@ -54,9 +54,10 @@ Use containers or VMs for those cases.
 
 ## Requirements
 
-- Linux kernel >= 5.13+ (Landlock support enabled)
+- Go 1.25+
+- Linux (kernel >= 5.13) or macOS (Darwin)
 
-### Kernel compatibility
+### Linux kernel compatibility (Landlock)
 
 | Capability | Landlock ABI | Typical minimum kernel |
 | --- | --- | --- |
@@ -77,7 +78,7 @@ Restrictions are applied immediately before launching the target command. Once s
 > 
 > - Kernel bugs or privileged local attackers.
 > - Resource exhaustion (CPU, memory, disk).
-> - Every possible host interaction outside configured Landlock controls.
+> - Every possible host interaction outside configured sandbox controls.
 > 
 > Treat it as a practical containment layer.
 
@@ -91,12 +92,12 @@ Restrictions are applied immediately before launching the target command. Once s
 
 * Using Go compiler:
 
-  ```bash
-  go install go.sandbox.ec/sandboxec@v0.3.0
-  ```
-
 > [!NOTE]
-> Requires [Go](https://go.dev/doc/install) 1.24.0 or later.
+> Requires [Go](https://go.dev/doc/install) 1.25.0 or later.
+
+  ```bash
+  go install go.sandbox.ec/sandboxec@v0.4.0
+  ```
 
 * Or download a pre-built binary from [releases page](https://github.com/sandboxec/sandboxec/releases).
 
@@ -108,7 +109,7 @@ Restrictions are applied immediately before launching the target command. Once s
   ```bash
   git clone https://github.com/sandboxec/sandboxec.git
   cd sandboxec/
-  # git checkout v0.3.0
+  # git checkout v0.4.0
   make build
   # ./bin/sandboxec --help
   ```
@@ -136,10 +137,9 @@ sandboxec --mode mcp --fs rx:/usr --fs rw:$PWD --net c:443
 | `-C, --named-config` | Named config profile (mapped to sandboxec/profiles repository). |
 | `-f, --fs RIGHTS:PATH` | Add filesystem rule (repeatable). |
 | `-n, --net RIGHTS:PORT` | Add network rule (repeatable). |
-| `--abi int` | Force specific Landlock ABI version (0 for default). |
+| `--abi int` | Force specific Landlock ABI version (0 for default). Linux only. |
 | `--best-effort` | Continue even if the kernel lacks support for some features. |
-| `--ignore-if-missing` | Do not fail if a rule path does not exist. |
-| `--restrict-scoped` | Enable scoped IPC restrictions (requires ABI v6+). |
+| `--restrict-scoped` | Enable scoped IPC restrictions (requires ABI v6+). Linux only. |
 | `--unsafe-host-runtime` | Allow read_exec rights for host runtime paths. |
 | `-m, --mode string` | Execution mode (`run` or `mcp`). Default: `run`. |
 | `-V, --version` | Show app version. |
@@ -153,6 +153,7 @@ Available MCP tools:
 
 > [!NOTE]
 > * `--restrict-scoped` requires Landlock ABI v6+.
+> * `--abi` and `--restrict-scoped` are hidden on other platforms. There, `abi` is ignored with a warning, and `restrict-scoped` fails instead of running without the restriction.
 > * `--unsafe-host-runtime` broadens allowed runtime & library access and weakens least-privilege guarantees.
 > * In `--mode mcp`, no wrapped command arguments are accepted.
 
@@ -171,7 +172,7 @@ Accepted rights:
 - `read_write_exec` or `rwx`
 
 > [!NOTE]
-> Filesystem restrictions require Landlock support (Linux 5.13+).
+> Filesystem restrictions require Landlock support on Linux (5.13+). On Darwin, filesystem rules are translated to Seatbelt policy rules.
 
 ### Network rules
 
@@ -184,7 +185,7 @@ Accepted rights:
 - `bind_connect` or `bc`
 
 > [!NOTE]
-> Network restrictions (`bind` / `connect`) require newer Landlock support (ABI v4+, typically Linux 6.7+).
+> Network restrictions (`bind` / `connect`) require newer Landlock support on Linux (ABI v4+, typically Linux 6.7+). On Darwin, network policy is deny-by-default and `--net` allow-lists selected ports.
 
 > [!IMPORTANT]
 > If the running kernel does not support requested features, use `--best-effort` to degrade gracefully.
@@ -194,6 +195,7 @@ Accepted rights:
 - Rules are allow-list based: if it is not allowed, it is denied. It is what it is.
 - Multiple `--fs` and `--net` entries are cumulative.
 - Rules should include every runtime dependency your command needs.
+- Without `--fs` rules, the command cannot read, write, or even start, including when `--net` rules are set. Grant `rx` on the command's directory (on macOS, `echo`, `cat`, and `sh` live in `/bin`).
 
 ## Configuration
 
@@ -202,10 +204,9 @@ Configuration is YAML-only.
 ### Keys
 
 ```yaml
-abi: 6
+abi: 6 # Linux only
 best-effort: false
-ignore-if-missing: false
-restrict-scoped: false
+restrict-scoped: false # Linux only
 unsafe-host-runtime: false
 fs:
   - rx:/bin
@@ -213,6 +214,9 @@ net:
   - c:443
 mode: run
 ```
+
+> [!NOTE]
+> `ignore-if-missing` is no longer configurable: fs rules with missing paths never fail. Setting it to `false` prints a warning.
 
 ### Config lookup
 
@@ -235,10 +239,7 @@ If no config file is found, defaults are used.
 ### Example profile
 
 ```yaml
-abi: 6
 best-effort: true
-ignore-if-missing: true
-restrict-scoped: false
 unsafe-host-runtime: false
 fs:
   - rx:/bin
@@ -258,7 +259,7 @@ Looking for ready-made policy profiles? See [sandboxec/profiles](https://github.
 
 - `0`: Wrapped command succeeded.
 - `N`: Wrapped command exited with code `N`.
-- `1`: **`sandboxec`** failed to setup (parsing error, Landlock failure).
+- `1`: **`sandboxec`** failed to setup (parsing error, policy enforcement failure).
 
 ## Practical notes
 
@@ -357,13 +358,15 @@ sandboxec \
 ## Troubleshooting
 
 - **`invalid fs rights`**: Check spelling (`rx`, `rw`, etc.).
-- **Landlock failures**: Your kernel *might* be too old. Try `--best-effort` or remove flags that require newer ABIs (like network rules on old kernels).
+- **Sandbox policy failures**:
+  - Linux: your kernel might be too old for requested Landlock features.
+  - Use `--best-effort` for compatibility fallback when strict enforcement is not required.
 
 If commands fail with `permission denied`:
 
 - Add missing runtime paths (`/usr`, `/lib`, `/usr/lib`, `/etc` as needed).
-- Check kernel capability for requested rule types.
-- Retry with `--best-effort` to confirm whether unsupported ABI features are the blocker.
+- Check platform capability for requested rule types.
+- Retry with `--best-effort` to confirm whether unsupported platform features are the blocker.
 
 # License
 

@@ -23,7 +23,7 @@ func TestLoadConfig_DefaultsWhenMissing(t *testing.T) {
 	if cfg.Mode != "run" {
 		t.Fatalf("unexpected default mode: %q", cfg.Mode)
 	}
-	if cfg.ABI != 0 || cfg.BestEffort || cfg.IgnoreIfMissing || cfg.RestrictScoped || cfg.UnsafeHostRuntime {
+	if cfg.ABI != 0 || cfg.BestEffort || cfg.FailIfMissing || cfg.RestrictScoped || cfg.UnsafeHostRuntime {
 		t.Fatalf("unexpected default scalar config: %+v", cfg)
 	}
 	if len(cfg.FSRules) != 0 || len(cfg.NetworkRules) != 0 {
@@ -38,7 +38,7 @@ func TestLoadConfig_ExplicitYAML(t *testing.T) {
 		"mode: mcp",
 		"abi: 6",
 		"best-effort: true",
-		"ignore-if-missing: true",
+		"ignore-if-missing: false",
 		"restrict-scoped: true",
 		"unsafe-host-runtime: true",
 		"fs:",
@@ -59,7 +59,7 @@ func TestLoadConfig_ExplicitYAML(t *testing.T) {
 	if cfg.Mode != "mcp" {
 		t.Fatalf("unexpected mode: %q", cfg.Mode)
 	}
-	if cfg.ABI != 6 || !cfg.BestEffort || !cfg.IgnoreIfMissing || !cfg.RestrictScoped || !cfg.UnsafeHostRuntime {
+	if cfg.ABI != 6 || !cfg.BestEffort || !cfg.FailIfMissing || !cfg.RestrictScoped || !cfg.UnsafeHostRuntime {
 		t.Fatalf("unexpected scalar config: %+v", cfg)
 	}
 	if !reflect.DeepEqual(cfg.FSRules, []string{"rx:/bin", "rw:/tmp"}) {
@@ -98,7 +98,7 @@ func TestLoadConfig_AutoSearchXDG(t *testing.T) {
 		t.Fatalf("mkdir config dir: %v", err)
 	}
 	path := filepath.Join(dir, "sandboxec.yaml")
-	content := "abi: 5\nfs:\n  - r:/etc\nnet:\n  - c:53\n"
+	content := "abi: 5\nignore-if-missing: true\nfs:\n  - r:/etc\nnet:\n  - c:53\n"
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
@@ -109,6 +109,9 @@ func TestLoadConfig_AutoSearchXDG(t *testing.T) {
 	}
 	if cfg.ABI != 5 {
 		t.Fatalf("expected abi 5, got %d", cfg.ABI)
+	}
+	if cfg.FailIfMissing {
+		t.Fatal("expected ignore-if-missing: true to keep FailIfMissing unset")
 	}
 	if !reflect.DeepEqual(cfg.FSRules, []string{"r:/etc"}) {
 		t.Fatalf("fs rules mismatch: %v", cfg.FSRules)

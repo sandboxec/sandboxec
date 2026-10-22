@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -24,18 +25,64 @@ func runSandboxec(t *testing.T, args ...string) (string, error) {
 	cmdArgs := append([]string{"run", "."}, args...)
 	cmd := exec.Command("go", cmdArgs...)
 	cmd.Dir = wd
+	// Build the binary under test like releases are built.
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 
-func requireLandlockSupport(t *testing.T) {
+func mustFindUnixCmd(t *testing.T, name string) string {
 	t.Helper()
-	out, err := runSandboxec(t, "--abi", "1", "--fs", "rx:/", "--", "/bin/true")
+
+	if runtime.GOOS == "windows" {
+		t.Skipf("%s command lookup is only supported on Unix-like hosts", name)
+	}
+
+	for _, candidate := range []string{
+		filepath.Join("/usr/bin", name),
+		filepath.Join("/bin", name),
+	} {
+		if st, err := os.Stat(candidate); err == nil && !st.IsDir() {
+			return candidate
+		}
+	}
+
+	if p, err := exec.LookPath(name); err == nil {
+		return p
+	}
+
+	t.Fatalf("required command %q not found in /usr/bin, /bin, or PATH", name)
+
+	return ""
+}
+
+func exampleFSArgs() []string {
+	args := []string{"--fs", "rx:/usr", "--fs", "rx:/bin"}
+	if runtime.GOOS == "darwin" {
+		// macOS curl links LibreSSL, which fails when openssl.cnf is unreadable.
+		args = append(args, "--fs", "r:/etc/ssl")
+	}
+
+	return args
+}
+
+func requireSandbox(t *testing.T) {
+	t.Helper()
+	truePath := mustFindUnixCmd(t, "true")
+
+	out, err := runSandboxec(t, "--fs", "rx:/", "--", truePath)
 	if err != nil {
 		lower := strings.ToLower(out)
-		if strings.Contains(lower, "landlock") &&
-			(strings.Contains(lower, "not supported") || strings.Contains(lower, "unavailable") || strings.Contains(lower, "unsupported")) {
-			t.Skipf("skipping: landlock unavailable on this host: %s", strings.TrimSpace(out))
+
+		hasUnavailableWord := strings.Contains(lower, "not supported") ||
+			strings.Contains(lower, "unavailable") ||
+			strings.Contains(lower, "unsupported")
+		hasLandlockUnavailable := strings.Contains(lower, "landlock") && hasUnavailableWord
+		hasSandboxUnavailable := strings.Contains(lower, "sandbox") && hasUnavailableWord
+		hasSeatbeltUnavailable := strings.Contains(lower, "seatbelt is unavailable")
+
+		if hasLandlockUnavailable || hasSandboxUnavailable || hasSeatbeltUnavailable {
+			t.Skipf("skipping: sandbox backend unavailable on this host: %s", strings.TrimSpace(out))
 		}
 		t.Fatalf("landlock probe failed unexpectedly: %v\noutput:\n%s", err, out)
 	}
@@ -57,9 +104,19 @@ func TestMainIntegration(t *testing.T) {
 				t.Fatalf("help output missing %q\noutput:\n%s", want, output)
 			}
 		}
+
+		// Landlock-only flags stay accepted but are hidden off Linux.
+		wantLandlockFlags := runtime.GOOS == "linux"
+		for _, flag := range []string{"--abi", "--restrict-scoped"} {
+			if got := strings.Contains(output, flag); got != wantLandlockFlags {
+				t.Fatalf("help output lists %s = %t, want %t\noutput:\n%s", flag, got, wantLandlockFlags, output)
+			}
+		}
 	})
 
 	t.Run("ArgumentValidation", func(t *testing.T) {
+		truePath := mustFindUnixCmd(t, "true")
+
 		t.Run("MissingCommandFails", func(t *testing.T) {
 			output, err := runSandboxec(t)
 			if err == nil {
@@ -94,7 +151,7 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("InvalidFSRuleRightsFails", func(t *testing.T) {
-			out, err := runSandboxec(t, "--fs", "nope:/tmp", "--", "/bin/true")
+			out, err := runSandboxec(t, "--fs", "nope:/tmp", "--", truePath)
 			if err == nil {
 				t.Fatalf("expected invalid fs rule to fail\noutput:\n%s", out)
 			}
@@ -104,7 +161,7 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("InvalidNetworkRulePortFails", func(t *testing.T) {
-			out, err := runSandboxec(t, "--net", "c:notaport", "--", "/bin/true")
+			out, err := runSandboxec(t, "--net", "c:notaport", "--", truePath)
 			if err == nil {
 				t.Fatalf("expected invalid network port to fail\noutput:\n%s", out)
 			}
@@ -115,15 +172,32 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("FSRules", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
-		touchPath, err := exec.LookPath("touch")
-		if err != nil {
-			t.Skip("touch not available")
-		}
+		touchPath := mustFindUnixCmd(t, "touch")
+		catPath := mustFindUnixCmd(t, "cat")
+
+		t.Run("DeniesReadWithoutRules", func(t *testing.T) {
+			secret := filepath.Join(t.TempDir(), "secret.txt")
+			if err := os.WriteFile(secret, []byte("sandboxec-secret\n"), 0o600); err != nil {
+				t.Fatalf("write secret file: %v", err)
+			}
+
+			out, err := runSandboxec(t, "--", catPath, secret)
+			if err == nil || strings.Contains(out, "sandboxec-secret") {
+				t.Fatalf("expected read without rules to be denied\nerr: %v\noutput:\n%s", err, out)
+			}
+
+			// Both platforms deny the exec: "permission denied" on Linux,
+			// "operation not permitted" on darwin.
+			lower := strings.ToLower(out)
+			if !strings.Contains(lower, "permission denied") && !strings.Contains(lower, "operation not permitted") {
+				t.Fatalf("expected a permission denial\nerr: %v\noutput:\n%s", err, out)
+			}
+		})
 
 		t.Run("AllowsTmpWrite", func(t *testing.T) {
-			tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))
+			tmpFile := filepath.Join("/tmp", fmt.Sprintf("sandboxec-fs-allow-%d", time.Now().UnixNano()))
 			t.Cleanup(func() { _ = os.Remove(tmpFile) })
 
 			out, err := runSandboxec(t,
@@ -167,15 +241,15 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("Examples", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
+		echoPath := mustFindUnixCmd(t, "echo")
+		lsPath := mustFindUnixCmd(t, "ls")
+		curlPath := mustFindUnixCmd(t, "curl")
+		fsArgs := exampleFSArgs()
 
 		t.Run("EchoHello", func(t *testing.T) {
-			out, err := runSandboxec(t,
-				"--fs", "rx:/usr",
-				"--",
-				"/usr/bin/echo",
-				"hello",
-			)
+			args := append(append([]string{}, fsArgs...), "--", echoPath, "hello")
+			out, err := runSandboxec(t, args...)
 			if err != nil {
 				t.Fatalf("expected echo example to succeed\nerr: %v\noutput:\n%s", err, out)
 			}
@@ -185,12 +259,8 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("ListUsr", func(t *testing.T) {
-			out, err := runSandboxec(t,
-				"--fs", "rx:/usr",
-				"--",
-				"/usr/bin/ls",
-				"/usr",
-			)
+			args := append(append([]string{}, fsArgs...), "--", lsPath, "/usr")
+			out, err := runSandboxec(t, args...)
 			if err != nil {
 				t.Fatalf("expected ls example to succeed\nerr: %v\noutput:\n%s", err, out)
 			}
@@ -200,11 +270,6 @@ func TestMainIntegration(t *testing.T) {
 		})
 
 		t.Run("CurlLocalhostWithPortRule", func(t *testing.T) {
-			const curlPath = "/usr/bin/curl"
-			if _, err := os.Stat(curlPath); err != nil {
-				t.Skip("/usr/bin/curl not available")
-			}
-
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("ok"))
 			}))
@@ -219,14 +284,14 @@ func TestMainIntegration(t *testing.T) {
 				t.Fatalf("parse port: %v", err)
 			}
 
-			out, err := runSandboxec(t,
-				"--fs", "rx:/usr",
+			args := append(append([]string{}, fsArgs...),
 				"--net", fmt.Sprintf("c:%d", port),
 				"--",
 				curlPath,
 				"-fsS",
 				fmt.Sprintf("http://127.0.0.1:%d", port),
 			)
+			out, err := runSandboxec(t, args...)
 			if err != nil {
 				t.Fatalf("expected curl localhost example to succeed\nerr: %v\noutput:\n%s", err, out)
 			}
@@ -237,12 +302,9 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("NetworkRules", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
-		curlPath, err := exec.LookPath("curl")
-		if err != nil {
-			t.Skip("curl not available")
-		}
+		curlPath := mustFindUnixCmd(t, "curl")
 
 		t.Run("CurlAllowedPortSucceeds", func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -307,12 +369,10 @@ func TestMainIntegration(t *testing.T) {
 	})
 
 	t.Run("ConfigPrecedence", func(t *testing.T) {
-		requireLandlockSupport(t)
+		requireSandbox(t)
 
-		touchPath, err := exec.LookPath("touch")
-		if err != nil {
-			t.Skip("touch not available")
-		}
+		touchPath := mustFindUnixCmd(t, "touch")
+		truePath := mustFindUnixCmd(t, "true")
 
 		dir := t.TempDir()
 		configPath := filepath.Join(dir, "sandboxec.yaml")
@@ -321,7 +381,7 @@ func TestMainIntegration(t *testing.T) {
 			t.Fatalf("write config file: %v", writeErr)
 		}
 
-		tmpAllowed := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-config-allow-%d", time.Now().UnixNano()))
+		tmpAllowed := filepath.Join("/tmp", fmt.Sprintf("sandboxec-config-allow-%d", time.Now().UnixNano()))
 		t.Cleanup(func() { _ = os.Remove(tmpAllowed) })
 
 		out, err := runSandboxec(t,
@@ -337,21 +397,75 @@ func TestMainIntegration(t *testing.T) {
 			t.Fatalf("expected file created via config-based rules: %v", statErr)
 		}
 
-		tmpBlocked := filepath.Join(os.TempDir(), fmt.Sprintf("sandboxec-config-block-%d", time.Now().UnixNano()))
-		t.Cleanup(func() { _ = os.Remove(tmpBlocked) })
+		badConfigPath := filepath.Join(dir, "sandboxec-invalid-fs.yaml")
+		badConfigBody := strings.Join([]string{"fs:", "  - nope:/tmp"}, "\n") + "\n"
+		if writeErr := os.WriteFile(badConfigPath, []byte(badConfigBody), 0o644); writeErr != nil {
+			t.Fatalf("write invalid config file: %v", writeErr)
+		}
 
 		out, err = runSandboxec(t,
-			"--config", configPath,
+			"--config", badConfigPath,
 			"--fs", "rx:/",
 			"--",
-			touchPath,
-			tmpBlocked,
+			truePath,
 		)
-		if err == nil {
-			t.Fatalf("expected flag fs to replace config rules and block /tmp write\noutput:\n%s", out)
+		if err != nil {
+			t.Fatalf("expected --fs flag to replace invalid config fs rules\nerr: %v\noutput:\n%s", err, out)
 		}
-		if _, statErr := os.Stat(tmpBlocked); statErr == nil {
-			t.Fatalf("expected override case to block file creation: %s", tmpBlocked)
-		}
+	})
+
+	t.Run("LandlockOnlySettings", func(t *testing.T) {
+		requireSandbox(t)
+
+		truePath := mustFindUnixCmd(t, "true")
+		isLinux := runtime.GOOS == "linux"
+
+		t.Run("ConfigSettingsAreReported", func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "sandboxec.yaml")
+			configBody := strings.Join([]string{"abi: 1", "ignore-if-missing: false", "fs:", "  - rx:/"}, "\n") + "\n"
+			if writeErr := os.WriteFile(configPath, []byte(configBody), 0o644); writeErr != nil {
+				t.Fatalf("write config file: %v", writeErr)
+			}
+
+			out, err := runSandboxec(t, "--config", configPath, "--", truePath)
+			if err != nil {
+				t.Fatalf("expected config with landlock-only settings to run\nerr: %v\noutput:\n%s", err, out)
+			}
+			if !strings.Contains(out, "warning: ignore-if-missing: false is ignored") {
+				t.Fatalf("expected ignore-if-missing warning\noutput:\n%s", out)
+			}
+			if got := strings.Contains(out, "warning: abi 1 is ignored"); got == isLinux {
+				t.Fatalf("abi warning shown = %t, want %t\noutput:\n%s", got, !isLinux, out)
+			}
+		})
+
+		t.Run("ConfigABIAppliesOnLinux", func(t *testing.T) {
+			if !isLinux {
+				t.Skip("abi is ignored off linux")
+			}
+
+			// ABI 1 predates network rules, so this fails only if abi reached Landlock.
+			configPath := filepath.Join(t.TempDir(), "sandboxec.yaml")
+			configBody := strings.Join([]string{"abi: 1", "fs:", "  - rx:/", "net:", "  - c:443"}, "\n") + "\n"
+			if writeErr := os.WriteFile(configPath, []byte(configBody), 0o644); writeErr != nil {
+				t.Fatalf("write config file: %v", writeErr)
+			}
+
+			out, err := runSandboxec(t, "--config", configPath, "--", truePath)
+			if err == nil || !strings.Contains(out, "network rules require ABI V4+") {
+				t.Fatalf("expected config abi 1 to reject network rules\nerr: %v\noutput:\n%s", err, out)
+			}
+		})
+
+		t.Run("RestrictScopedFailsOffLinux", func(t *testing.T) {
+			if isLinux {
+				t.Skip("restrict-scoped is supported on linux")
+			}
+
+			out, err := runSandboxec(t, "--restrict-scoped", "--fs", "rx:/", "--", truePath)
+			if err == nil || !strings.Contains(out, "restrict-scoped is unsupported") {
+				t.Fatalf("expected restrict-scoped to fail off linux\nerr: %v\noutput:\n%s", err, out)
+			}
+		})
 	})
 }

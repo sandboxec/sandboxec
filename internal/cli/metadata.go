@@ -2,7 +2,7 @@ package cli
 
 const (
 	AppName        = "sandboxec"
-	AppDescription = "A lightweight command sandbox for Linux, built on Landlock."
+	AppDescription = "A lightweight command sandboxer, secure-by-default."
 	AppAuthor      = "Dwi Siswanto <me@dw1.io>"
 
 	AppUsage = `Usage:
@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	AppVersion     = "v0.3.0"
+	AppVersion     = "v0.4.0"
 	AppBuildCommit = ""
 	AppBuildDate   = ""
 )
